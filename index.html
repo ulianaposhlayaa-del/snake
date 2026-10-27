@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nokia 3310 Snake</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #2b2b2b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: monospace;
+            overflow: hidden;
+            user-select: none;
+        }
+        #gameContainer {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: rgb(128, 140, 112);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        canvas {
+            background-color: rgb(128, 140, 112);
+            border: 4px solid rgb(40, 48, 40);
+        }
+        #dpad {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .btn {
+            background-color: rgb(40, 48, 40);
+            color: rgb(128, 140, 112);
+            border: none;
+            border-radius: 8px;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        .btn:active { background-color: rgb(60, 70, 60); }
+        #btnUp { grid-column: 2; grid-row: 1; }
+        #btnLeft { grid-column: 1; grid-row: 2; }
+        #btnRight { grid-column: 3; grid-row: 2; }
+        #btnDown { grid-column: 2; grid-row: 3; }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <canvas id="gameCanvas" width="400" height="340"></canvas>
+    <div id="dpad">
+        <button class="btn" id="btnUp">▲</button>
+        <button class="btn" id="btnLeft">◀</button>
+        <button class="btn" id="btnRight">▶</button>
+        <button class="btn" id="btnDown">▼</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // Игровые переменные (ОЗУ)
+    let snake = [{x: 10, y: 8}];
+    let direction = 'D';
+    let nextDirection = 'D';
+    let score = 0;
+    let highScore = localStorage.getItem("high_score") ? parseInt(localStorage.getItem("high_score")) : 0;
+    let apple = generateFood();
+    let animFrame = 0;
+    let isMenu = true;
+    let gameOver = false;
+    let isNewRecord = false;
+
+    // Генерация шума (Nokia подложка)
+    const noisePoints = [];
+    for(let i = 0; i < 800; i++) {
+        noisePoints.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            isLight: Math.random() > 0.5
+        });
+    }
+
+    function generateFood() {
+        return {
+            x: 1 + Math.floor(Math.random() * 18),
+            y: 1 + Math.floor(Math.random() * 13)
+        };
+    }
+
+    // Обработка кликов по экрану (Тач-зоны)
+    canvas.addEventListener("mousedown", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        if (isMenu) {
+            if (mx >= 130 && mx <= 270 && my >= 135 && my <= 175) {
+                resetGame();
+                isMenu = false;
+            }
+        } else if (gameOver) {
+            if (mx >= 130 && mx <= 270 && my >= 165 && my <= 205) {
+                resetGame();
+                gameOver = false;
+                isNewRecord = false;
+            }
+        }
+    });
+
+    function resetGame() {
+        snake = [{x: 10, y: 8}];
+        direction = 'D';
+        nextDirection = 'D';
+        score = 0;
+        apple = generateFood();
+    }
+
+    // Управление с клавиатуры ПК
+    document.addEventListener("keydown", (e) => {
+        if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') if (direction !== 'S') nextDirection = 'W';
+        if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') if (direction !== 'W') nextDirection = 'S';
+        if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') if (direction !== 'D') nextDirection = 'A';
+        if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') if (direction !== 'A') nextDirection = 'D';
+        if (e.key === 'r' || e.key === 'R') {
+            if (gameOver) { resetGame(); gameOver = false; isNewRecord = false; }
+        }
+    });
+
+    // Управление с экранных кнопок смартфона
+    document.getElementById("btnUp").addEventListener("touchstart", () => { if (direction !== 'S') nextDirection = 'W'; });
+    document.getElementById("btnDown").addEventListener("touchstart", () => { if (direction !== 'W') nextDirection = 'S'; });
+    document.getElementById("btnLeft").addEventListener("touchstart", () => { if (direction !== 'D') nextDirection = 'A'; });
+    document.getElementById("btnRight").addEventListener("touchstart", () => { if (direction !== 'A') nextDirection = 'D'; });
+    
+    // Дублирование для мышки ПК
+    document.getElementById("btnUp").addEventListener("mousedown", () => { if (direction !== 'S') nextDirection = 'W'; });
+    document.getElementById("btnDown").addEventListener("mousedown", () => { if (direction !== 'W') nextDirection = 'S'; });
+    document.getElementById("btnLeft").addEventListener("mousedown", () => { if (direction !== 'D') nextDirection = 'A'; });
+    document.getElementById("btnRight").addEventListener("mousedown", () => { if (direction !== 'A') nextDirection = 'D'; });
+
+    // Главный игровой цикл (300мс)
+    function gameLoop() {
+        direction = nextDirection;
+
+        if (!gameOver) {
+            // ИИ Автопилот для Меню
+            if (isMenu) {
+                if (apple.x > snake[0].x && direction !== 'A') nextDirection = 'D';
+                else if (apple.x < snake[0].x && direction !== 'D') nextDirection = 'A';
+                else if (apple.y > snake[0].y && direction !== 'W') nextDirection = 'S';
+                else if (apple.y < snake[0].y && direction !== 'S') nextDirection = 'W';
+            }
+
+            // Движение головы
+            let head = {x: snake[0].x, y: snake[0].y};
+            if (direction === 'W') head.y--;
+            if (direction === 'S') head.y++;
+            if (direction === 'A') head.x--;
+            if (direction === 'D') head.x++;
+
+            snake.unshift(head);
+
+            // Проверка стен
+            if (!isMenu && (head.x >= 19 || head.x < 1 || head.y >= 14 || head.y < 1)) {
+                gameOver = true;
+                if (score > highScore) {
+                    highScore = score;
+                    isNewRecord = true;
+                    localStorage.setItem("high_score", highScore); // Сохранение на устройстве вечно!
+                } else {
+                    isNewRecord = false;
+                }
+            }
+
+            // Съедание яблока
+            if (head.x === apple.x && head.y === apple.y) {
+                score++;
+                apple = generateFood();
+            } else {
+                if (!gameOver) snake.pop();
+            }
+        }
+
+        draw();
+        setTimeout(gameLoop, 300);
+    }
+
+    function draw() {
+        // 1. Очистка и Шум
+        ctx.fillStyle = "rgb(128, 140, 112)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        noisePoints.forEach(p => {
+            ctx.fillStyle = p.isLight ? "rgb(133, 145, 117)" : "rgb(125, 135, 107)";
+            ctx.fillRect(p.x, p.y, 2, 2);
+        });
+
+        // 2. Рамка поля
+        ctx.strokeStyle = "rgb(40, 48, 40)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(20, 20, 360, 260);
+
+        // 3. Анимированное яблоко-мушка
+        let ax = apple.x * 20;
+        let ay = apple.y * 20;
+        ctx.fillStyle = "rgb(40, 48, 40)";
+        ctx.fillRect(ax + 4, ay + 4, 12, 12);
+        if (animFrame % 2 === 0) {
+            ctx.fillRect(ax + 6, ay + 2, 4, 2);
+        } else {
+            ctx.fillRect(ax + 10, ay + 2, 4, 2);
+        }
+        animFrame++;
+
+        // 4. Отрисовка Змейки (Скругленные кубики без глаз)
+        snake.forEach(seg => {
+            let sx = seg.x * 20;
+            let sy = seg.y * 20;
+            ctx.fillRect(sx + 2, sy, 16, 20);
+            ctx.fillRect(sx, sy + 2, 20, 16);
+        });
+
+        ctx.font = "20px monospace";
+        ctx.fillStyle = "rgb(40, 48, 40)";
+
+        // 5. Интерфейс Главного Меню
+        if (isMenu) {
+            ctx.strokeRect(130, 135, 140, 40);
+            ctx.fillText("START", 170, 160);
+            let recText = "RECORD: " + highScore;
+            ctx.fillText(recText, 200 - ctx.measureText(recText).width/2, 210);
+        }
+
+        // 6. Экран MISS!
+        if (gameOver) {
+            ctx.fillText("MISS!", 170, 140);
+            let recOverText = isNewRecord ? "NEW RECORD!" : "RECORD: " + highScore;
+            ctx.fillText(recOverText, 200 - ctx.measureText(recOverText).width/2, 160);
+            ctx.strokeRect(130, 175, 140, 40);
+            ctx.fillText("RESTART", 160, 200);
+        }
+
+        // 7. Постоянный вывод SCORE и RECORD внизу
+        ctx.fillText("SCORE: " + score, 25, 315);
+        ctx.fillText("RECORD: " + highScore, 240, 315);
+    }
+
+    gameLoop();
+</script>
+</body>
+</html>
