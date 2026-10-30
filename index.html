@@ -16,7 +16,6 @@
             font-family: monospace;
             overflow: hidden;
             user-select: none;
-            touch-action: none;
         }
         #gameContainer {
             display: flex;
@@ -73,6 +72,7 @@
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
 
+    // Игровые переменные (ОЗУ)
     let snake = [{x: 10, y: 8}];
     let direction = 'D';
     let nextDirection = 'D';
@@ -84,11 +84,8 @@
     let gameOver = false;
     let isNewRecord = false;
 
-    let touchStartX = 0;
-    let touchStartY = 0;
-
+    // Генерация шума (Nokia подложка)
     const noisePoints = [];
-    // ИСПРАВЛЕНО: заменили C++ 'int i' на JavaScript 'let i'
     for(let i = 0; i < 800; i++) {
         noisePoints.push({
             x: Math.random() * canvas.width,
@@ -104,29 +101,11 @@
         };
     }
 
+    // Обработка кликов по экрану (Тач-зоны)
     canvas.addEventListener("mousedown", (e) => {
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
-
-        if (isMenu) {
-            if (mx >= 130 && mx <= 270 && my >= 135 && my <= 175) {
-                resetGame();
-                isMenu = false;
-            }
-        } else if (gameOver) {
-            if (mx >= 130 && mx <= 270 && my >= 165 && my <= 205) {
-                resetGame();
-                gameOver = false;
-                isNewRecord = false;
-            }
-        }
-    });
-
-    canvas.addEventListener("touchstart", (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const mx = e.touches[0].clientX - rect.left;
-        const my = e.touches[0].clientY - rect.top;
 
         if (isMenu) {
             if (mx >= 130 && mx <= 270 && my >= 135 && my <= 175) {
@@ -150,6 +129,7 @@
         apple = generateFood();
     }
 
+    // Управление с клавиатуры ПК
     document.addEventListener("keydown", (e) => {
         if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') if (direction !== 'S') nextDirection = 'W';
         if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') if (direction !== 'W') nextDirection = 'S';
@@ -160,51 +140,32 @@
         }
     });
 
-    window.addEventListener("touchstart", function(e) {
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-    });
-
-    window.addEventListener("touchend", function(e) {
-        let touchEndX = e.changedTouches[0].clientX;
-        let touchEndY = e.changedTouches[0].clientY;
-
-        let dx = touchEndX - touchStartX;
-        let dy = touchEndY - touchStartY;
-
-        if (Math.abs(dx) > 35 || Math.abs(dy) > 35) {
-            if (Math.abs(dx) > Math.abs(dy)) {
-                if (dx > 0 && direction !== 'A') nextDirection = 'D';
-                else if (dx < 0 && direction !== 'D') nextDirection = 'A';
-            } else {
-                if (dy > 0 && direction !== 'W') nextDirection = 'S';
-                else if (dy < 0 && direction !== 'S') nextDirection = 'W';
-            }
-        }
-    });
-
-    document.getElementById("btnUp").addEventListener("touchstart", (e) => { e.preventDefault(); if (direction !== 'S') nextDirection = 'W'; });
-    document.getElementById("btnDown").addEventListener("touchstart", (e) => { e.preventDefault(); if (direction !== 'W') nextDirection = 'S'; });
-    document.getElementById("btnLeft").addEventListener("touchstart", (e) => { e.preventDefault(); if (direction !== 'D') nextDirection = 'A'; });
-    document.getElementById("btnRight").addEventListener("touchstart", (e) => { e.preventDefault(); if (direction !== 'A') nextDirection = 'D'; });
+    // Управление с экранных кнопок смартфона
+    document.getElementById("btnUp").addEventListener("touchstart", () => { if (direction !== 'S') nextDirection = 'W'; });
+    document.getElementById("btnDown").addEventListener("touchstart", () => { if (direction !== 'W') nextDirection = 'S'; });
+    document.getElementById("btnLeft").addEventListener("touchstart", () => { if (direction !== 'D') nextDirection = 'A'; });
+    document.getElementById("btnRight").addEventListener("touchstart", () => { if (direction !== 'A') nextDirection = 'D'; });
     
+    // Дублирование для мышки ПК
     document.getElementById("btnUp").addEventListener("mousedown", () => { if (direction !== 'S') nextDirection = 'W'; });
     document.getElementById("btnDown").addEventListener("mousedown", () => { if (direction !== 'W') nextDirection = 'S'; });
     document.getElementById("btnLeft").addEventListener("mousedown", () => { if (direction !== 'D') nextDirection = 'A'; });
     document.getElementById("btnRight").addEventListener("mousedown", () => { if (direction !== 'A') nextDirection = 'D'; });
 
+    // Главный игровой цикл (300мс)
     function gameLoop() {
         direction = nextDirection;
 
         if (!gameOver) {
+            // ИИ Автопилот для Меню
             if (isMenu) {
-                let head = snake[0];
-                if (apple.x > head.x && direction !== 'A') nextDirection = 'D';
-                else if (apple.x < head.x && direction !== 'D') nextDirection = 'A';
-                else if (apple.y > head.y && direction !== 'W') nextDirection = 'S';
-                else if (apple.y < head.y && direction !== 'S') nextDirection = 'W';
+                if (apple.x > snake[0].x && direction !== 'A') nextDirection = 'D';
+                else if (apple.x < snake[0].x && direction !== 'D') nextDirection = 'A';
+                else if (apple.y > snake[0].y && direction !== 'W') nextDirection = 'S';
+                else if (apple.y < snake[0].y && direction !== 'S') nextDirection = 'W';
             }
 
+            // Движение головы
             let head = {x: snake[0].x, y: snake[0].y};
             if (direction === 'W') head.y--;
             if (direction === 'S') head.y++;
@@ -213,17 +174,19 @@
 
             snake.unshift(head);
 
+            // Проверка стен
             if (!isMenu && (head.x >= 19 || head.x < 1 || head.y >= 14 || head.y < 1)) {
                 gameOver = true;
                 if (score > highScore) {
                     highScore = score;
                     isNewRecord = true;
-                    localStorage.setItem("high_score", highScore);
+                    localStorage.setItem("high_score", highScore); // Сохранение на устройстве вечно!
                 } else {
                     isNewRecord = false;
                 }
             }
 
+            // Съедание яблока
             if (head.x === apple.x && head.y === apple.y) {
                 score++;
                 apple = generateFood();
@@ -237,6 +200,7 @@
     }
 
     function draw() {
+        // 1. Очистка и Шум
         ctx.fillStyle = "rgb(128, 140, 112)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         noisePoints.forEach(p => {
@@ -244,10 +208,12 @@
             ctx.fillRect(p.x, p.y, 2, 2);
         });
 
+        // 2. Рамка поля
         ctx.strokeStyle = "rgb(40, 48, 40)";
         ctx.lineWidth = 2;
         ctx.strokeRect(20, 20, 360, 260);
 
+        // 3. Анимированное яблоко-мушка
         let ax = apple.x * 20;
         let ay = apple.y * 20;
         ctx.fillStyle = "rgb(40, 48, 40)";
@@ -259,6 +225,7 @@
         }
         animFrame++;
 
+        // 4. Отрисовка Змейки (Скругленные кубики без глаз)
         snake.forEach(seg => {
             let sx = seg.x * 20;
             let sy = seg.y * 20;
@@ -269,6 +236,7 @@
         ctx.font = "20px monospace";
         ctx.fillStyle = "rgb(40, 48, 40)";
 
+        // 5. Интерфейс Главного Меню
         if (isMenu) {
             ctx.strokeRect(130, 135, 140, 40);
             ctx.fillText("START", 170, 160);
@@ -276,16 +244,21 @@
             ctx.fillText(recText, 200 - ctx.measureText(recText).width/2, 210);
         }
 
+        // 6. Экран MISS!
         if (gameOver) {
             ctx.fillText("MISS!", 170, 140);
-                        let recOverText = isNewRecord ? "NEW RECORD!" : "RECORD: " + highScore;
+            let recOverText = isNewRecord ? "NEW RECORD!" : "RECORD: " + highScore;
             ctx.fillText(recOverText, 200 - ctx.measureText(recOverText).width/2, 160);
             ctx.strokeRect(130, 175, 140, 40);
             ctx.fillText("RESTART", 160, 200);
         }
 
+        // 7. Постоянный вывод SCORE и RECORD внизу
         ctx.fillText("SCORE: " + score, 25, 315);
         ctx.fillText("RECORD: " + highScore, 240, 315);
     }
 
     gameLoop();
+</script>
+</body>
+</html>
